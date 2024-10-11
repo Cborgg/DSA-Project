@@ -9,25 +9,27 @@
 #include <queue>
 #include <algorithm>
 
+using namespace std;
+
 // Structure to hold book information
 struct Book {
-    std::string ISBN;
-    std::string title;
-    std::string author;
-    std::string genre;
+    string ISBN;
+    string title;
+    string author;
+    string genre;
     int publicationYear;
 };
 
 // Levenshtein Distance for typo handling (used in BK-Tree)
-int levenshteinDistance(const std::string& s1, const std::string& s2) {
+int levenshteinDistance(const string& s1, const string& s2) {
     const size_t m = s1.size(), n = s2.size();
-    std::vector<std::vector<int>> dp(m + 1, std::vector<int>(n + 1));
+    vector<vector<int>> dp(m + 1, vector<int>(n + 1));
     for (size_t i = 0; i <= m; ++i) dp[i][0] = i;
     for (size_t j = 0; j <= n; ++j) dp[0][j] = j;
     for (size_t i = 1; i <= m; ++i) {
         for (size_t j = 1; j <= n; ++j) {
             int cost = (s1[i - 1] == s2[j - 1]) ? 0 : 1;
-            dp[i][j] = std::min({dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost});
+            dp[i][j] = min({dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost});
         }
     }
     return dp[m][n];
@@ -36,10 +38,10 @@ int levenshteinDistance(const std::string& s1, const std::string& s2) {
 // BK-Tree Node Structure
 class BKTreeNode {
 public:
-    std::string word;
-    std::unordered_map<int, BKTreeNode*> children;
+    string word;
+    unordered_map<int, BKTreeNode*> children;
 
-    BKTreeNode(const std::string& w) : word(w) {}
+    BKTreeNode(const string& w) : word(w) {}
 };
 
 // BK-Tree for typo-tolerant title search
@@ -47,7 +49,7 @@ class BKTree {
 public:
     BKTree() : root(nullptr) {}
 
-    void insert(const std::string& word) {
+    void insert(const string& word) {
         if (!root) {
             root = new BKTreeNode(word);
             return;
@@ -61,8 +63,8 @@ public:
         node->children[dist] = new BKTreeNode(word);
     }
 
-    std::unordered_set<std::string> search(const std::string& word, int maxDist) {
-        std::unordered_set<std::string> results;
+    unordered_set<string> search(const string& word, int maxDist) {
+        unordered_set<string> results;
         searchHelper(root, word, maxDist, results);
         return results;
     }
@@ -70,7 +72,7 @@ public:
 private:
     BKTreeNode* root;
 
-    void searchHelper(BKTreeNode* node, const std::string& word, int maxDist, std::unordered_set<std::string>& results) {
+    void searchHelper(BKTreeNode* node, const string& word, int maxDist, unordered_set<string>& results) {
         if (!node) return;
         int dist = levenshteinDistance(word, node->word);
         if (dist <= maxDist) {
@@ -93,9 +95,9 @@ public:
         indexBook(book);
     }
 
-    std::vector<Book> searchBooks(const std::string& query, int maxDist = 1) {
-        std::unordered_set<std::string> candidateTitles = bkTree.search(query, maxDist);
-        std::vector<std::pair<double, Book>> rankedResults;
+    vector<Book> searchBooks(const string& query, int maxDist = 1) {
+        unordered_set<string> candidateTitles = bkTree.search(query, maxDist);
+        vector<pair<double, Book>> rankedResults;
 
         for (const auto& title : candidateTitles) {
             for (const auto& [ISBN, book] : books) {
@@ -106,11 +108,11 @@ public:
             }
         }
 
-        std::sort(rankedResults.begin(), rankedResults.end(), [](auto& a, auto& b) {
+        sort(rankedResults.begin(), rankedResults.end(), [](auto& a, auto& b) {
             return a.first > b.first;
         });
 
-        std::vector<Book> results;
+        vector<Book> results;
         for (const auto& [score, book] : rankedResults) {
             results.push_back(book);
         }
@@ -118,11 +120,11 @@ public:
     }
 
 private:
-    std::unordered_map<std::string, Book> books;
+    unordered_map<string, Book> books;
     BKTree bkTree;
-    std::unordered_map<std::string, std::unordered_set<std::string>> invertedIndex;
+    unordered_map<string, unordered_set<string>> invertedIndex;
 
-    void insertToBKTree(const std::string& title) {
+    void insertToBKTree(const string& title) {
         bkTree.insert(title);
     }
 
@@ -133,12 +135,12 @@ private:
         }
     }
 
-    std::vector<std::string> splitIntoWords(const std::string& text) {
-        std::vector<std::string> words;
-        std::string word;
+    vector<string> splitIntoWords(const string& text) {
+        vector<string> words;
+        string word;
         for (char c : text) {
-            if (std::isalnum(c)) {
-                word += std::tolower(c);
+            if (isalnum(c)) {
+                word += tolower(c);
             } else if (!word.empty()) {
                 words.push_back(word);
                 word.clear();
@@ -150,7 +152,7 @@ private:
         return words;
     }
 
-    double calculateBM25(const std::string& query, const Book& book) {
+    double calculateBM25(const string& query, const Book& book) {
         const double k = 1.5;
         const double b = 0.75;
         double score = 0.0;
@@ -163,7 +165,7 @@ private:
             if (invertedIndex.count(term)) {
                 double termFrequency = invertedIndex[term].count(book.ISBN);
                 double docFrequency = invertedIndex[term].size();
-                double idf = std::log((books.size() - docFrequency + 0.5) / (docFrequency + 0.5) + 1);
+                double idf = log((books.size() - docFrequency + 0.5) / (docFrequency + 0.5) + 1);
                 double tf = (termFrequency * (k + 1)) / (termFrequency + k * (1 - b + b * (bookWordCount / avgDocLength)));
                 score += idf * tf;
             }
@@ -189,7 +191,7 @@ int main() {
 
     auto results = library.searchBooks("Code", 1);
     for (const auto& book : results) {
-        std::cout << "Found Book: " << book.title << " by " << book.author << std::endl;
+        cout << "Found Book: " << book.title << " by " << book.author << endl;
     }
 
     return 0;
