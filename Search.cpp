@@ -6,7 +6,6 @@
 #include <cmath>
 #include <map>
 #include <set>
-#include <queue>
 #include <algorithm>
 
 using namespace std;
@@ -44,7 +43,7 @@ public:
     BKTreeNode(const string& w) : word(w) {}
 };
 
-// BK-Tree for typo-tolerant title search
+// BK-Tree for typo-tolerant word search
 class BKTree {
 public:
     BKTree() : root(nullptr) {}
@@ -63,8 +62,8 @@ public:
         node->children[dist] = new BKTreeNode(word);
     }
 
-    unordered_set<string> search(const string& word, int maxDist) {
-        unordered_set<string> results;
+    vector<string> search(const string& word, int maxDist) {
+        vector<string> results;
         searchHelper(root, word, maxDist, results);
         return results;
     }
@@ -72,13 +71,15 @@ public:
 private:
     BKTreeNode* root;
 
-    void searchHelper(BKTreeNode* node, const string& word, int maxDist, unordered_set<string>& results) {
+    void searchHelper(BKTreeNode* node, const string& word, int maxDist, vector<string>& results) {
         if (!node) return;
         int dist = levenshteinDistance(word, node->word);
         if (dist <= maxDist) {
-            results.insert(node->word);
+            results.push_back(node->word);
         }
-        for (const auto& [key, child] : node->children) {
+        for (const auto& entry : node->children) {
+            int key = entry.first;
+            BKTreeNode* child = entry.second;
             if (key >= dist - maxDist && key <= dist + maxDist) {
                 searchHelper(child, word, maxDist, results);
             }
@@ -86,35 +87,27 @@ private:
     }
 };
 
-// Library System with Inverted Index and BM25 Ranking
+// Library System with word-based BK-Tree search
 class LibrarySystem {
 public:
     void addBook(const Book& book) {
         books[book.ISBN] = book;
-        insertToBKTree(book.title);
-        indexBook(book);
+        indexWordsInTitle(book);
     }
 
     vector<Book> searchBooks(const string& query, int maxDist = 1) {
-        unordered_set<string> candidateTitles = bkTree.search(query, maxDist);
-        vector<pair<double, Book>> rankedResults;
+        vector<string> matchedWords = bkTree.search(query, maxDist);
+        unordered_set<string> matchedISBNs;
 
-        for (const auto& title : candidateTitles) {
-            for (const auto& [ISBN, book] : books) {
-                if (book.title == title) {
-                    double score = calculateBM25(query, book);
-                    rankedResults.emplace_back(score, book);
-                }
+        for (const auto& word : matchedWords) {
+            if (wordToISBNs.count(word)) {
+                matchedISBNs.insert(wordToISBNs[word].begin(), wordToISBNs[word].end());
             }
         }
 
-        sort(rankedResults.begin(), rankedResults.end(), [](auto& a, auto& b) {
-            return a.first > b.first;
-        });
-
         vector<Book> results;
-        for (const auto& [score, book] : rankedResults) {
-            results.push_back(book);
+        for (const auto& ISBN : matchedISBNs) {
+            results.push_back(books[ISBN]);
         }
         return results;
     }
@@ -122,16 +115,13 @@ public:
 private:
     unordered_map<string, Book> books;
     BKTree bkTree;
-    unordered_map<string, unordered_set<string>> invertedIndex;
+    unordered_map<string, unordered_set<string>> wordToISBNs;
 
-    void insertToBKTree(const string& title) {
-        bkTree.insert(title);
-    }
-
-    void indexBook(const Book& book) {
-        auto words = splitIntoWords(book.title + " " + book.author + " " + book.genre);
+    void indexWordsInTitle(const Book& book) {
+        vector<string> words = splitIntoWords(book.title);
         for (const auto& word : words) {
-            invertedIndex[word].insert(book.ISBN);
+            bkTree.insert(word);
+            wordToISBNs[word].insert(book.ISBN);
         }
     }
 
@@ -151,47 +141,26 @@ private:
         }
         return words;
     }
-
-    double calculateBM25(const string& query, const Book& book) {
-        const double k = 1.5;
-        const double b = 0.75;
-        double score = 0.0;
-
-        auto queryWords = splitIntoWords(query);
-        double bookWordCount = splitIntoWords(book.title + " " + book.author + " " + book.genre).size();
-        double avgDocLength = calculateAverageDocLength();
-        
-        for (const auto& term : queryWords) {
-            if (invertedIndex.count(term)) {
-                double termFrequency = invertedIndex[term].count(book.ISBN);
-                double docFrequency = invertedIndex[term].size();
-                double idf = log((books.size() - docFrequency + 0.5) / (docFrequency + 0.5) + 1);
-                double tf = (termFrequency * (k + 1)) / (termFrequency + k * (1 - b + b * (bookWordCount / avgDocLength)));
-                score += idf * tf;
-            }
-        }
-        return score;
-    }
-
-    double calculateAverageDocLength() {
-        double totalLength = 0.0;
-        for (const auto& [ISBN, book] : books) {
-            totalLength += splitIntoWords(book.title + " " + book.author + " " + book.genre).size();
-        }
-        return totalLength / books.size();
-    }
 };
 
 // Example usage
 int main() {
     LibrarySystem library;
-    library.addBook({"12345", "C++ Programming", "Bjarne Stroustrup", "Programming", 1997});
-    library.addBook({"67890", "The Pragmatic Programmer", "Andrew Hunt", "Software Engineering", 1999});
+    library.addBook({"12345", "C++ The Programmer", "Bjarne Stroustrup", "Programming", 1997});
+    library.addBook({"67890", "The Pragmatic The Programmer", "Andrew Hunt", "Software Engineering", 1999});
     library.addBook({"54321", "Clean Code", "Robert Martin", "Software Engineering", 2008});
 
-    auto results = library.searchBooks("Code", 1);
-    for (const auto& book : results) {
-        cout << "Found Book: " << book.title << " by " << book.author << endl;
+    string query;
+    cout << "Enter a book title to search: ";
+    getline(cin, query);
+
+    auto results = library.searchBooks(query, 5);
+    if (results.empty()) {
+        cout << "No books found for the query: " << query << endl;
+    } else {
+        for (const auto& book : results) {
+            cout << "Found Book: " << book.title << " by " << book.author << endl;
+        }
     }
 
     return 0;
