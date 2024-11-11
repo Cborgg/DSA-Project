@@ -7,6 +7,8 @@
 #include <map>
 #include <set>
 #include <algorithm>
+#include <fstream>
+#include <sstream>
 
 using namespace std;
 
@@ -15,7 +17,6 @@ struct Book {
     string ISBN;
     string title;
     string author;
-    string genre;
     int publicationYear;
 };
 
@@ -125,6 +126,48 @@ public:
         return results;
     }
 
+   void loadBooksFromCSV(const string& filename) {
+    ifstream file(filename);
+    if (!file.is_open()) {
+        cerr << "Failed to open file: " << filename << endl;
+        return;
+    }
+
+    string line;
+
+    while (getline(file, line)) {
+        stringstream ss(line);
+        string ISBN, title, author, yearStr;
+
+        // Parse the fields using ';' as separator
+        getline(ss, ISBN, ';');
+        getline(ss, title, ';');
+        getline(ss, author, ';');
+        getline(ss, yearStr, ';');  // year is the 4th field
+        //cout<<"ISBN = "<<ISBN<<" title = "<<title<<" author = "<<author<<" yearstr = "<<yearStr<<'\n';
+        // Skip lines with missing required fields (ISBN, title, author, year)
+        if (ISBN.empty() || title.empty() || author.empty() || yearStr.empty()) {
+            cerr << "Skipping line due to missing fields: " << line << endl;
+            continue;
+        }
+
+
+
+        // Validate and convert yearStr to integer
+        yearStr = yearStr.substr(1,4);
+        int publicationYear = stoi(yearStr);
+
+        // Add book to the system
+        addBook({ISBN, title, author, publicationYear});
+
+    }
+
+    file.close();
+}
+
+
+
+
 private:
     unordered_map<string, Book> books;
     BKTree bkTree;
@@ -159,26 +202,26 @@ private:
 // Example usage
 int main() {
     LibrarySystem library;
-    library.addBook({"12345", "C++ The Programmer", "Bjarne Stroustrup", "Programming", 1997});
-    library.addBook({"67890", "The Pragmatic The Programmer", "Andrew Hunt", "Software Engineering", 1999});
-    library.addBook({"54321", "Clean Code", "Robert Martin", "Software Engineering", 2008});
+    library.loadBooksFromCSV("books.csv");
 
     string query;
     cout << "Enter a book title to search: ";
     getline(cin, query);
 
-    int noOfBooks = 3;
+    int noOfBooks = 50;
     set<Book, BookComparator> results; 
     int size = min(noOfBooks, 5);
     int i = 0;
 
-    while (results.size() != size) {
+    while (results.size() < size) {
         auto books = library.searchBooks(query, i);
         for (const auto& book : books) {
+            if(results.size()>size) break;
             results.insert(book);
+            
         }
         i++;
-        if (i > 10) break;
+        if (i > 5) break;
     }
 
     if (results.empty()) {
