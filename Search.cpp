@@ -19,6 +19,19 @@ struct Book {
     int publicationYear;
 };
 
+bool operator<(const Book& lhs, const Book& rhs) {
+    return lhs.ISBN < rhs.ISBN;
+}
+
+// Custom comparator for Book
+struct BookComparator {
+    bool operator()(const Book& lhs, const Book& rhs) const {
+        return lhs.ISBN < rhs.ISBN;
+    }
+};
+
+
+
 // Levenshtein Distance for typo handling (used in BK-Tree)
 int levenshteinDistance(const string& s1, const string& s2) {
     const size_t m = s1.size(), n = s2.size();
@@ -154,7 +167,20 @@ int main() {
     cout << "Enter a book title to search: ";
     getline(cin, query);
 
-    auto results = library.searchBooks(query, 5);
+    int noOfBooks = 3;
+    set<Book, BookComparator> results; 
+    int size = min(noOfBooks, 5);
+    int i = 0;
+
+    while (results.size() != size) {
+        auto books = library.searchBooks(query, i);
+        for (const auto& book : books) {
+            results.insert(book);
+        }
+        i++;
+        if (i > 10) break;
+    }
+
     if (results.empty()) {
         cout << "No books found for the query: " << query << endl;
     } else {
@@ -165,3 +191,4 @@ int main() {
 
     return 0;
 }
+
