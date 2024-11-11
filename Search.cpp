@@ -175,10 +175,17 @@ private:
 
     void indexWordsInTitle(const Book& book) {
         vector<string> words = splitIntoWords(book.title);
+        vector<string> words1 = splitIntoWords(book.author);
         for (const auto& word : words) {
             bkTree.insert(word);
             wordToISBNs[word].insert(book.ISBN);
         }
+
+        for (const auto& word : words1) {
+            bkTree.insert(word);
+            wordToISBNs[word].insert(book.ISBN);
+        }
+
     }
 
     vector<string> splitIntoWords(const string& text) {
@@ -199,38 +206,69 @@ private:
     }
 };
 
+vector<string> splitIntoWords(const string& query) {
+    vector<string> words;
+    stringstream ss(query);
+    string word;
+    
+    // Split by spaces
+    while (ss >> word) {
+        words.push_back(word);
+    }
+    
+    return words;
+}
+
 // Example usage
 int main() {
     LibrarySystem library;
     library.loadBooksFromCSV("books.csv");
 
-    string query;
-    cout << "Enter a book title to search: ";
-    getline(cin, query);
-
-    int noOfBooks = 50;
-    set<Book, BookComparator> results; 
-    int size = min(noOfBooks, 5);
-    int i = 0;
-
-    while (results.size() < size) {
-        auto books = library.searchBooks(query, i);
-        for (const auto& book : books) {
-            if(results.size()>size) break;
-            results.insert(book);
-            
+    while(true){
+        string query;
+        
+        cout<<"Enter Exit to stop searching"<<'\n';
+        cout << "Enter a book title / author to search: ";
+        getline(cin, query);
+        string toExit = query;
+        transform(toExit.begin(), toExit.end(), toExit.begin(), ::toupper);
+        if(toExit == "EXIT"){
+            return 0;
         }
-        i++;
-        if (i > 5) break;
+
+        vector<string> words = splitIntoWords(query);
+
+        int noOfBooks = 50;
+        set<Book, BookComparator> results; 
+        int size = 10;
+        int i = 0;
+        int tolerance = 2;
+        while (results.size() < size) {
+            for(auto it: words){
+                auto books = library.searchBooks(it, i);
+                for (const auto& book : books) {
+                    results.insert(book);         
+                }
+                i++;
+                if (i>tolerance) break;
+            }
+            if(i>tolerance) break;
+        }
+
+        if (results.empty()) {
+            cout << "No books found for the query: " << query << endl;
+        } else {
+            int count = 0;
+            for (const auto& book : results) {
+                cout << "Found Book: " << book.title << " by " << book.author << endl;
+                count++;
+                if(count>size) break;
+            }
+        }
+
     }
 
-    if (results.empty()) {
-        cout << "No books found for the query: " << query << endl;
-    } else {
-        for (const auto& book : results) {
-            cout << "Found Book: " << book.title << " by " << book.author << endl;
-        }
-    }
+    
 
     return 0;
 }
